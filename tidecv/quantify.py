@@ -1,13 +1,14 @@
-from .data import Data
-from .ap import ClassedAPDataObject
-from .errors.main_errors import *
-from .errors.qualifiers import Qualifier, AREA
+from collections import OrderedDict, defaultdict
+
+import numpy as np
+from pycocotools import mask as mask_utils
+
 from . import functions as f
 from . import plotting as P
-
-from pycocotools import mask as mask_utils
-from collections import defaultdict, OrderedDict
-import numpy as np
+from .ap import ClassedAPDataObject
+from .data import Data
+from .errors.main_errors import *
+from .errors.qualifiers import AREA, Qualifier
 
 
 class TIDEExample:
@@ -293,7 +294,7 @@ class TIDERun:
 
                 # Test for BackgroundError
                 idx = ex.gt_iou[pred_idx, :].argmax()
-                iou = ex.gt_iou[pred_idx, idx] 
+                iou = ex.gt_iou[pred_idx, idx]
                 if iou <= self.bg_thresh:
                     # This should have been marked as background
                     self._add_error(BackgroundError(pred))
