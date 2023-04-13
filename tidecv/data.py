@@ -135,4 +135,4 @@ class Data:
 
     def get(self, image_id: int):
         """Collects all the annotations / detections for that particular image."""
-        return [self.annotations[x] for x in self.images[image_id]["anns"]]
+        return [self.annotations[x] for x in self.images.get(image_id, {}).get("anns", [])]
