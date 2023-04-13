@@ -1,16 +1,19 @@
 import pathlib
 from setuptools import setup
+import json
 
 # The directory containing this file
 HERE = pathlib.Path(__file__).parent
 
 # The text of the README file
 README = (HERE / "README.md").read_text(encoding="utf8")
+with open("tidecv/__init__.py") as f:
+    VERSION = json.loads(f.readlines()[0].split("=")[1].strip())
 
 # This call to setup() does all the work
 setup(
     name="rungalileo-tidecv",
-    version="0.0.2",
+    version=VERSION,
     description="A General Toolbox for Identifying ObjectDetection Errors",
     long_description=README,
     long_description_content_type="text/markdown",
