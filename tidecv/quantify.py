@@ -303,7 +303,8 @@ class TIDERun:
                 # A base case to catch uncaught errors
                 # self._add_error(OtherError(pred))
                 # idx is already representing the gt box with highest overlap
-                self._add_error(ClassBoxError(pred))
+                self._add_error(ClassBoxError(pred, ex.gt[idx]))
+                pred["info"]["iou"] = iou
 
         for truth in gt:
             # If the GT wasn't used in matching, meaning it's some kind of false negative

@@ -75,8 +75,9 @@ class ClassBoxError(Error):
     )
     short_name = "ClsLoc"
 
-    def __init__(self, pred: dict):
+    def __init__(self, pred: dict, gt: dict):
         self.pred = pred
+        self.gt = gt
 
     def fix(self):
         return None
