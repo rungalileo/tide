@@ -181,7 +181,7 @@ class TIDERun:
     def _run(self):
         """And awaaay we go"""
 
-        for image in self.gt.images:
+        for image in set(self.gt.images).union(self.preds.images):
             x = self.preds.get(image)
             y = self.gt.get(image)
 
