@@ -67,31 +67,6 @@ def json_to_Data(json_path: str) -> Tuple[Data, Data]:
 
     return gts, preds
 
-# def create_filtered_Data(data: Data, ids_keep: set, data_name:str = "filtered_data") -> Data:
-#     """
-#     Create a filtered object Data containing only the annotations with ids in ids_keep
-#     """
-#     # Create GTs Data
-#     data_filtered = Data(name=data_name)
-
-#     # Restrict the annotations
-#     annotations = [ann for ann in data.annotations if ann["_id"] in ids_keep]
-#     data_filtered.annotations = annotations
-
-#     # Restrict the classes
-#     for i in sorted({ann["class"] for ann in annotations}):
-#         data_filtered.classes[i] = f"Class {i}"
-    
-#     # Restrict the images and what annotations they have
-#     image_ids = defaultdict(list)
-#     for i, ann in enumerate(annotations):
-#         image_ids[ann['image_id']].append(ann["_id"])
-#     for i, anns in image_ids.items():
-#         data_filtered.images[i]["name"] = f"Image {i}"
-#         data_filtered.images[i]["anns"] = anns
-
-#     return data_filtered
-
 def create_filtered_Data(data: Data, ids_keep: set, data_name:str = "filtered_data") -> Data:
     """
     Create a filtered object Data containing only the annotations with ids in ids_keep
