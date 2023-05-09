@@ -177,6 +177,9 @@ class ClassedAPDataObject:
 
     def get_mAP(self) -> float:
         aps = [x.get_ap() for x in self.objs.values() if not x.is_empty()]
+        # If there are no objects (no golds, no preds), then it's a perfect run
+        if not aps:
+            return 100.0
         return sum(aps) / len(aps)
 
     def get_APs(self) -> Dict[int, float]:
