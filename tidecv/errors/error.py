@@ -30,6 +30,18 @@ class Error:
         else:
             return None
 
+    def is_pred(self) -> bool:
+        return hasattr(self, "pred")
+    def is_gt(self) -> bool:
+        return hasattr(self, "gt")
+    def is_contained_in(self, pred_ids: set, gt_ids: set) -> bool:
+        # check if NONe
+        if not isinstance(pred_ids, set):
+            pred_ids = set(pred_ids)
+        if not isinstance(gt_ids, set):
+            gt_ids = set(gt_ids)
+        return (self.get_id() in pred_ids) if self.is_pred() else (self.get_id() in gt_ids)
+
     def get_id(self) -> int:
         if hasattr(self, "pred"):
             return self.pred["_id"]
