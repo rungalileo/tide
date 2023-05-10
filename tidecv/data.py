@@ -5,7 +5,7 @@ class Data:
     """
     A class to hold ground truth or predictions data in an easy to work with format.
     Note that any time they appear, bounding boxes are [x, y, width, height] where
-    x,y are the coordinates of the top_left corner, and masks are either a list of 
+    x,y are the coordinates of the top_left corner, and masks are either a list of
     polygons or pycocotools RLEs.
 
     Also, don't mix ground truth with predictions. Keep them in separate data objects.
@@ -131,4 +131,6 @@ class Data:
 
     def get(self, image_id: int):
         """Collects all the annotations / detections for that particular image."""
-        return [self.annotations[x] for x in self.images.get(image_id, {}).get("anns", [])]
+        return [
+            self.annotations[x] for x in self.images.get(image_id, {}).get("anns", [])
+        ]

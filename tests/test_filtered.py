@@ -1,60 +1,75 @@
 from collections import defaultdict
-import random
+from unittest import TestCase
 
 from tidecv.quantify import TIDE
-from tests.constants import TEST_ASSETS_DIR, mAP_threshold, RANDOM_SEED
-from tidecv.helpers import json_to_Data, enlarge_dataset_to_respect_TIDE, create_filtered_Data
+from tests.constants import TEST_ASSETS_DIR, mAP_threshold
+from tidecv.helpers import json_to_Data, enlarge_dataset_to_respect_TIDE
 
 
-# Parse json to create the Data structures for GT and Pred
-json_path = f"{TEST_ASSETS_DIR}/soda_df_box_20_images.json"
-SODA_gts, SODA_preds = json_to_Data(json_path)
+class TestHelpers(TestCase):
+    def setUp(self):
+        # Parse json to create the Data structures for GT and Pred
+        json_path = f"{TEST_ASSETS_DIR}/soda_df_box_20_images.json"
+        self.SODA_gts, self.SODA_preds = json_to_Data(json_path)
 
-# Call TIDE on the entire Dataset
-tide = TIDE(pos_threshold=mAP_threshold)
-run = tide.evaluate(gt=SODA_gts, preds=SODA_preds, name="tide_run")
+        # Call TIDE on the entire Dataset
+        self.tide = TIDE(pos_threshold=mAP_threshold)
+        _ = self.tide.evaluate(gt=self.SODA_gts, preds=self.SODA_preds, name="tide_run")
 
+    def test_recalc_on_filtered(self):
+        """
+        Test that recalculating mAP/impact on mAP/errors on any filtered
+        dataset can be done from the original run tide object (without
+        recalculating TIDE from scratch)
+        #"""
+        # If we don't restrict to ids of this form, we have to be more careful
+        # with remapping when comparing
+        gts_keep = list(range(100))
+        preds_keep = list(range(100))
 
-def test_recalc_on_filtered():
-    """
-    Test that recalculating mAP/impact on mAP/errors on any filtered dataset can be done
-    from the original run tide object (without recalculating TIDE from scratch) 
-    """
-    # Select 50 GTs and 50 Preds, and create the filtered dataset with all added links
-    random.seed(RANDOM_SEED)
-    gts_keep = set(random.sample([ann["_id"] for ann in SODA_gts.annotations], 5))
-    preds_keep = set(random.sample([ann["_id"] for ann in SODA_preds.annotations], 5))
+        (
+            gts_enlarged,
+            preds_enlarged,
+            gts_new_id_to_old_id,
+            preds_new_id_to_old_id,
+        ) = enlarge_dataset_to_respect_TIDE(
+            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep
+        )
 
-    SODA_gts_filtered, SODA_preds_filtered, gts_enlarged_new_id_to_old_id, preds_enlarged_new_id_to_old_id = enlarge_dataset_to_respect_TIDE(SODA_gts, SODA_preds, gts_keep, preds_keep)
+        # Calculate TIDE on the filtered (+ enlarged) data
+        tide_filtered = TIDE(pos_threshold=mAP_threshold)
+        run_filtered = tide_filtered.evaluate(
+            gt=gts_enlarged, preds=preds_enlarged, name="tide_run"
+        )
 
-    # Calculate TIDE on the filtered (+ enlarged) data
-    tide_filtered = TIDE(pos_threshold=mAP_threshold)
-    run_filtered = tide_filtered.evaluate(gt=SODA_gts_filtered, preds=SODA_preds_filtered, name="tide_run_filtered")
-    
-    APs_filtered = run_filtered.ap_data.get_APs()
-    mAP_filtered = run_filtered.ap_data.get_mAP()
-    # errors_filtered = tide_filtered.get_main_errors()["tide_run_filtered"]
+        APs_filtered = run_filtered.ap_data.get_APs()
+        mAP_filtered = run_filtered.ap_data.get_mAP()
+        errors_filtered = tide_filtered.get_main_errors()["tide_run"]
 
+        # Calculate TIDE by restricting to ids
+        # First need to get a dict cls -> ids for both GT and Pred
+        gts_filtered_cls_to_ids = defaultdict(set)
+        for ann in gts_enlarged.annotations:
+            gts_filtered_cls_to_ids[ann["class"]].add(gts_new_id_to_old_id[ann["_id"]])
+        preds_filtered_cls_to_ids = defaultdict(set)
+        for ann in preds_enlarged.annotations:
+            preds_filtered_cls_to_ids[ann["class"]].add(
+                preds_new_id_to_old_id[ann["_id"]]
+            )
 
-    # Calculate TIDE by restricting to ids
-    # First need to get a dict cls -> ids for both GT and Pred
-    SODA_gts_filtered_cls_to_ids = defaultdict(set)
-    for ann in SODA_gts_filtered.annotations:
-        SODA_gts_filtered_cls_to_ids[ann["class"]].add(gts_enlarged_new_id_to_old_id[ann["_id"]])
-    SODA_preds_filtered_cls_to_ids = defaultdict(set)
-    for ann in SODA_preds_filtered.annotations:
-        SODA_preds_filtered_cls_to_ids[ann["class"]].add(preds_enlarged_new_id_to_old_id[ann["_id"]])
+        errors_restricted = self.tide.get_main_errors(
+            pred_dict=preds_filtered_cls_to_ids, gt_dict=gts_filtered_cls_to_ids
+        )["filtered_errors_in_run_tide_run"]
+        APs_restricted = self.tide.runs["tide_run"].qualifiers["restricted_APs"]
+        mAP_restricted = self.tide.runs["tide_run"].qualifiers["restricted_mAP"]
 
-    errors_restricted = tide.get_main_errors(pred_dict=SODA_preds_filtered_cls_to_ids, gt_dict=SODA_gts_filtered_cls_to_ids)["filtered_errors_in_run_tide_run"]
-    APs_restricted = tide.runs['tide_run'].qualifiers['restricted_APs']
-    mAP_restricted = tide.runs['tide_run'].qualifiers['restricted_mAP']
+        # Assert that mAP on filtered/enlarged = restricted TIDE on original
+        assert mAP_filtered == mAP_restricted
 
+        # Assert that APs on filtered/enlarged = restricted TIDE on original
+        assert APs_filtered == APs_restricted
 
-    # Assert that mAP on filtered/enlarged = restricted TIDE on original
-    assert mAP_filtered == mAP_restricted
+        # Assert that impact on mAP on filtered/enlarged = restricted TIDE on original
+        assert errors_filtered == errors_restricted
 
-    # Assert that APs on filtered/enlarged = restricted TIDE on original
-    assert APs_filtered == APs_restricted
-
-    # Assert that impact on mAP on filtered/enlarged = restricted TIDE on original
-    # TODO
+        print("done")

@@ -9,7 +9,7 @@ from . import plotting as P
 from .ap import ClassedAPDataObject
 from .data import Data
 from .errors.main_errors import *
-from .errors.qualifiers import AREA, Qualifier
+from .errors.qualifiers import Qualifier
 
 
 class TIDEExample:
@@ -326,7 +326,7 @@ class TIDERun:
         ap_data: ClassedAPDataObject = None,
         disable_errors: bool = False,
         pred_dict: dict = None,
-        gt_dict: dict = None
+        gt_dict: dict = None,
     ) -> ClassedAPDataObject:
         """Returns a ClassedAPDataObject where all errors given the condition returns True are fixed."""
         if ap_data is None:
@@ -334,7 +334,7 @@ class TIDERun:
 
         if gt_dict:
             gt_ids = set.union(*gt_dict.values())
-        
+
         gt_pos = ap_data.get_gt_positives()
         new_ap_data = ClassedAPDataObject()
 
@@ -346,9 +346,13 @@ class TIDERun:
             _id = error.get_id()
             _cls, data_point = error.original
 
-            if pred_dict and gt_dict and not error.is_contained_in(pred_dict.get(_cls, {}), gt_ids):
+            if (
+                pred_dict
+                and gt_dict
+                and not error.is_contained_in(pred_dict.get(_cls, {}), gt_ids)
+            ):
                 continue
-            
+
             if condition(error):
                 _cls, data_point = error.fixed
 
@@ -388,7 +392,7 @@ class TIDERun:
         error_types: list = None,
         qual: Qualifier = None,
         pred_dict: dict = None,
-        gt_dict: dict = None
+        gt_dict: dict = None,
     ) -> dict:
         ap_data = self.ap_data
 
@@ -416,7 +420,7 @@ class TIDERun:
                 ap_data=ap_data,
                 disable_errors=progressive,
                 pred_dict=pred_dict,
-                gt_dict=gt_dict
+                gt_dict=gt_dict,
             )
 
             new_ap = _ap_data.get_mAP()
@@ -710,29 +714,34 @@ class TIDE:
 
             print()
 
-    def get_main_errors(self, run_names: List[str] = None, pred_dict: dict = None, gt_dict: dict = None):
+    def get_main_errors(
+        self, run_names: List[str] = None, pred_dict: dict = None, gt_dict: dict = None
+    ):
         """
         args:
         - run_names: if specified, only return the specified runs
-        - pred_dict, gt_dict: dictionaries of the form cls_id -> set of ids to keep. If specified,
-            we restrict to the dataset whose ids are contained in these sets and recalculate mAP, and
-            impact on mAP based on this filtered data.
+        - pred_dict, gt_dict: dictionaries of the form cls_id -> set of ids
+            to keep. If specified, we restrict to the dataset whose ids are
+            contained in these sets and recalculate mAP, and impact on mAP
+            based on this filtered data.
         """
         errors = {}
 
         if run_names is None:
             run_names = list(self.runs)
-        
+
         for run_name in run_names:
             run = self.runs[run_name]
-            
+
             if pred_dict or gt_dict:
                 run_name = f"filtered_errors_in_run_{run_name}"
 
                 # we recalculate it every time for filtered runs since we can't index by the filter.
                 errors[run_name] = {
                     error.short_name: value
-                    for error, value in run.fix_main_errors(pred_dict=pred_dict, gt_dict=gt_dict).items()
+                    for error, value in run.fix_main_errors(
+                        pred_dict=pred_dict, gt_dict=gt_dict
+                    ).items()
                 }
             elif run_name in self.run_main_errors:
                 errors[run_name] = self.run_main_errors[run_name]

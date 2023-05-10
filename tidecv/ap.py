@@ -4,7 +4,6 @@ from typing import Dict
 import numpy as np
 from pycocotools import mask as mask_utils
 
-from . import functions as f
 from .data import Data
 
 
@@ -15,18 +14,21 @@ class APDataObject:
     """
 
     def __init__(self):
-        self.data_points = {} # dict with all preds with that label (id -> data)
-        self.false_negatives = set() # set of FN ids with that label (i.e., not TPs, i.e., FN + Missed)
-        self.num_gt_positives = 0 # total number of GTs with that label
+        self.data_points = {}  # dict with all preds (id -> data)
+        self.false_negatives = set()  # set of FN ids (i.e., not TPs, i.e., FN + Missed)
+        self.num_gt_positives = 0  # total number of GTs
         self.curve = None
 
     def apply_qualifier_no_check(self, kept_preds: set, kept_gts: set) -> object:
         """
-        Makes a new data object where we only keep some of the ids in the pred and gt lists.
+        Makes a new data object where we only keep some of the ids in the pred
+        and gt lists.
         We make no checks and assume that the given ids are exactly what we want.
-        (As an example we could check that given a Pred TP, we also have the associated GT 
-        making it a TP, otherwise that Pred could turn into an FP in the filtered data object.
-        We do not make such checks in order to avoid unexpected effects).
+
+        As an example we could check that given a Pred TP, we also have the
+        associated GT making it a TP, otherwise that Pred could turn into an FP
+        in the filtered data object.
+        We do not make such checks in order to avoid unexpected effects.
         """
         obj = APDataObject()
 
@@ -34,7 +36,11 @@ class APDataObject:
             kept_preds = set(kept_preds)
 
         # Restrict the Preds
-        obj.data_points = {pred_id:pred_vals for pred_id, pred_vals in self.data_points.items() if pred_id in kept_preds}
+        obj.data_points = {
+            pred_id: pred_vals
+            for pred_id, pred_vals in self.data_points.items()
+            if pred_id in kept_preds
+        }
 
         # Propogate the Gts
         obj.false_negatives = self.false_negatives.intersection(kept_gts)
@@ -42,9 +48,10 @@ class APDataObject:
 
         return obj
 
-
     def apply_qualifier(self, kept_preds: set, kept_gts: set) -> object:
-        """Makes a new data object where we remove the ids in the pred and gt lists."""
+        """
+        Makes a new data object where we remove the ids in the preds and gts.
+        """
         obj = APDataObject()
         num_gt_removed = 0
 
@@ -54,8 +61,10 @@ class APDataObject:
         for pred_id in self.data_points:
             score, is_true, info = self.data_points[pred_id]
 
-            # If the data point we kept was a true positive, there's a corresponding ground truth
-            # If so, we should only add that positive if the corresponding ground truth has been kept
+            # If the data point we kept was a true positive, there's a
+            # corresponding ground truth.
+            # If so, we should only add that positive if the corresponding
+            # ground truth has been kept
             if is_true and info["matched_with"] not in kept_gts:
                 num_gt_removed += 1
                 continue
@@ -153,7 +162,9 @@ class ClassedAPDataObject:
     def __init__(self):
         self.objs = defaultdict(lambda: APDataObject())
 
-    def apply_qualifier(self, pred_dict: dict, gt_dict: dict, check: bool = False) -> object:
+    def apply_qualifier(
+        self, pred_dict: dict, gt_dict: dict, check: bool = False
+    ) -> object:
         ret = ClassedAPDataObject()
 
         for _class, obj in self.objs.items():
@@ -183,7 +194,9 @@ class ClassedAPDataObject:
         return sum(aps) / len(aps)
 
     def get_APs(self) -> Dict[int, float]:
-        return {cls_id: x.get_ap() for cls_id, x in self.objs.items() if not x.is_empty()}
+        return {
+            cls_id: x.get_ap() for cls_id, x in self.objs.items() if not x.is_empty()
+        }
 
     def get_gt_positives(self) -> dict:
         return {k: v.num_gt_positives for k, v in self.objs.items()}
@@ -258,7 +271,6 @@ class APEval:
         crowd_classes = [x["category_id"] for x in gt_crowd]
 
         for _class in set(classes + gt_classes):
-            ap_per_iou = []
             num_gt_for_class = sum([1 for x in gt_classes if x == _class])
 
             for iouIdx in range(len(self.iou_thresholds)):
