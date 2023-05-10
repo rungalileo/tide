@@ -1,4 +1,5 @@
 from unittest import TestCase
+import random
 
 from tidecv.helpers import (
     json_to_Data,
@@ -6,7 +7,7 @@ from tidecv.helpers import (
     filter_dataset_to_label,
     create_filtered_Data,
 )
-from tests.constants import TEST_ASSETS_DIR, mAP_threshold
+from tests.constants import TEST_ASSETS_DIR, mAP_threshold, RANDOM_SEED
 from tidecv.quantify import TIDE
 
 
@@ -47,7 +48,7 @@ class TestHelpers(TestCase):
             gts_new_id_to_old_id,
             preds_new_id_to_old_id,
         ) = enlarge_dataset_to_respect_TIDE(
-            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep
+            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep, self.run.errors
         )
 
         # Assert the enlarged ids are what we calculate by hand.
@@ -66,9 +67,12 @@ class TestHelpers(TestCase):
         """
         Assert that if we re-run TIDE, we do have the same error types
         """
-        # gts_keep = list(range(18, 20))
-        gts_keep = {18}
-        preds_keep = set()  # list(range(10))
+        # Select any 50 preds and 50 gts to start with.
+        random.seed(RANDOM_SEED)
+        gts_keep = random.sample([ann["_id"] for ann in self.SODA_gts.annotations], 50)
+        preds_keep = random.sample(
+            [ann["_id"] for ann in self.SODA_preds.annotations], 50
+        )
 
         (
             gts_enlarged,
@@ -76,7 +80,7 @@ class TestHelpers(TestCase):
             gts_new_id_to_old_id,
             preds_new_id_to_old_id,
         ) = enlarge_dataset_to_respect_TIDE(
-            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep
+            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep, self.run.errors
         )
 
         tide_filtered = TIDE(pos_threshold=mAP_threshold)
@@ -101,14 +105,13 @@ class TestHelpers(TestCase):
         gt_old_ids = set(gts_new_id_to_old_id.values())
         restricted_error_uids = set()
         for error in self.run.errors:
-            if (error.is_pred() and error.get_id() not in pred_old_ids) or (
-                error.is_gt() and error.get_id() not in gt_old_ids
+            if (error.is_pred() and error.get_id() in pred_old_ids) or (
+                not error.is_pred() and error.get_id() in gt_old_ids
             ):
-                continue
-            error_gt_id = error.gt["id"] if hasattr(error, "gt") else None
-            error_pred_id = error.pred["id"] if hasattr(error, "pred") else None
-            error_name = error.short_name
-            restricted_error_uids.add(f"{error_name}_{error_pred_id}_{error_gt_id}")
+                error_gt_id = error.gt["id"] if hasattr(error, "gt") else None
+                error_pred_id = error.pred["id"] if hasattr(error, "pred") else None
+                error_name = error.short_name
+                restricted_error_uids.add(f"{error_name}_{error_pred_id}_{error_gt_id}")
 
         assert filtered_error_uids == restricted_error_uids
 

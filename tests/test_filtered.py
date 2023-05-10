@@ -1,8 +1,9 @@
 from collections import defaultdict
 from unittest import TestCase
+import random
 
 from tidecv.quantify import TIDE
-from tests.constants import TEST_ASSETS_DIR, mAP_threshold
+from tests.constants import TEST_ASSETS_DIR, mAP_threshold, RANDOM_SEED
 from tidecv.helpers import json_to_Data, enlarge_dataset_to_respect_TIDE
 
 
@@ -14,7 +15,9 @@ class TestHelpers(TestCase):
 
         # Call TIDE on the entire Dataset
         self.tide = TIDE(pos_threshold=mAP_threshold)
-        _ = self.tide.evaluate(gt=self.SODA_gts, preds=self.SODA_preds, name="tide_run")
+        self.run = self.tide.evaluate(
+            gt=self.SODA_gts, preds=self.SODA_preds, name="tide_run"
+        )
 
     def test_recalc_on_filtered(self):
         """
@@ -22,10 +25,12 @@ class TestHelpers(TestCase):
         dataset can be done from the original run tide object (without
         recalculating TIDE from scratch)
         #"""
-        # If we don't restrict to ids of this form, we have to be more careful
-        # with remapping when comparing
-        gts_keep = list(range(100))
-        preds_keep = list(range(100))
+        # Select any 50 preds and 50 gts.
+        random.seed(RANDOM_SEED)
+        gts_keep = random.sample([ann["_id"] for ann in self.SODA_gts.annotations], 50)
+        preds_keep = random.sample(
+            [ann["_id"] for ann in self.SODA_preds.annotations], 50
+        )
 
         (
             gts_enlarged,
@@ -33,7 +38,7 @@ class TestHelpers(TestCase):
             gts_new_id_to_old_id,
             preds_new_id_to_old_id,
         ) = enlarge_dataset_to_respect_TIDE(
-            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep
+            self.SODA_gts, self.SODA_preds, gts_keep, preds_keep, self.run.errors
         )
 
         # Calculate TIDE on the filtered (+ enlarged) data

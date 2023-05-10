@@ -1,9 +1,10 @@
 import json
-from typing import Tuple
+from typing import Tuple, List
 from collections import defaultdict
 from copy import copy
 
 from tidecv.data import Data
+from tidecv.errors.error import Error
 
 
 def json_to_Data(json_path: str) -> Tuple[Data, Data]:
@@ -120,7 +121,7 @@ def create_filtered_Data(
 
 
 def enlarge_dataset_to_respect_TIDE(
-    gts: Data, preds: Data, gts_keep: set, preds_keep: set
+    gts: Data, preds: Data, gts_keep: set, preds_keep: set, errors: List[Error]
 ) -> Tuple[Data, Data, dict, dict]:
     """
     Enlarge completely to respect TIDE, i.e., add all the possible links since
@@ -133,26 +134,37 @@ def enlarge_dataset_to_respect_TIDE(
     dataset with only 1-links.
 
     input:
-    - gts, preds: the Data instance for gts and preds
+    - gts, preds: the Data instance for gts and preds. The preds instance is
+        also used to extract the links pred TP -> gt TP
     - gts_keep, preds_keep: set of ids to keep in the filtered dataset
+    - errors: list of errors that is used to extract the links pred -> gt for
+        when pred is not a TP
 
     return:
     - a tuple of Data instances (gts_enlarged, preds_enlarged)
     """
 
+    # Extract a mapping pred error id -> gt assoc id
+    pred_id_to_gt_id = {}
+    for error in errors:
+        if hasattr(error, "pred") and hasattr(error, "gt"):
+            pred_id_to_gt_id[error.pred["_id"]] = error.gt["_id"]
+    # Add mappings pred TP id -> gt assoc TP id
+    pred_id_to_gt_id.update(
+        {
+            pred["_id"]: pred["info"]["matched_with"]
+            for pred in preds.annotations
+            if "matched_with" in pred.get("info", {})
+        }
+    )
+
     # Add GTs
-    assoc_gts = {
-        pred["info"]["matched_with"]
-        for pred in preds.annotations
-        if "matched_with" in pred["info"] and pred["_id"] in preds_keep
-    }
+    assoc_gts = {pred_id_to_gt_id[pred_id] for pred_id in preds_keep}
 
     # Add Preds
     filetered_gts = set(gts_keep).union(assoc_gts)
     assoc_preds = {
-        pred["_id"]
-        for pred in preds.annotations
-        if pred["info"].get("matched_with") in filetered_gts
+        pred_id for pred_id, gt_id in pred_id_to_gt_id.items() if gt_id in filetered_gts
     }
     filetered_preds = assoc_preds.union(preds_keep)
 
