@@ -76,5 +76,4 @@ class TestHelpers(TestCase):
 
         # Assert that impact on mAP on filtered/enlarged = restricted TIDE on original
         assert errors_filtered == errors_restricted
-
-        print("done")
+        
