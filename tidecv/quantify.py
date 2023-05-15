@@ -718,12 +718,22 @@ class TIDE:
         self, run_names: List[str] = None, pred_dict: dict = None, gt_dict: dict = None
     ):
         """
+        Calculates the error count and impact on mAP. To calculate it on a filtered version
+        of the data, specify the indexes to keep in the dicts pred_dict and gt_dict.
+
         args:
         - run_names: if specified, only return the specified runs
         - pred_dict, gt_dict: dictionaries of the form cls_id -> set of ids
             to keep. If specified, we restrict to the dataset whose ids are
             contained in these sets and recalculate mAP, and impact on mAP
             based on this filtered data.
+
+        returns:
+            dictionary error_type -> impact on mAP
+
+        side effects:
+            populates self.runs[run_name].qualifiers["restricted_mAP"] with new mAP
+            and self.runs[run_name].qualifiers["restricted_APs"] with AP per class
         """
         errors = {}
 
