@@ -1,10 +1,10 @@
+import random
 from collections import defaultdict
 from unittest import TestCase
-import random
 
+from tests.constants import RANDOM_SEED, TEST_ASSETS_DIR, mAP_threshold
+from tidecv.helpers import enlarge_dataset_to_respect_TIDE, json_to_Data
 from tidecv.quantify import TIDE
-from tests.constants import TEST_ASSETS_DIR, mAP_threshold, RANDOM_SEED
-from tidecv.helpers import json_to_Data, enlarge_dataset_to_respect_TIDE
 
 
 class TestHelpers(TestCase):

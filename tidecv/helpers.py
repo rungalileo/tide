@@ -1,7 +1,7 @@
 import json
-from typing import Tuple, List
 from collections import defaultdict
 from copy import copy
+from typing import List, Tuple
 
 from tidecv.data import Data
 from tidecv.errors.error import Error
