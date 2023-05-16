@@ -1,6 +1,11 @@
 from collections import defaultdict
+from typing import List, Dict, DefaultDict
+from dataclasses import dataclass, field
+from dataclasses_json import dataclass_json
 
 
+@dataclass_json
+@dataclass
 class Data:
     """
     A class to hold ground truth or predictions data in an easy to work with format.
@@ -13,17 +18,25 @@ class Data:
     'max_dets' specifies the maximum number of detections the model is allowed to output for a given image.
     """
 
-    def __init__(self, name: str, max_dets: int = 100):
-        self.name = name
-        self.max_dets = max_dets
+    name: str
+    max_dets: int = 100
+    classes: Dict[int, str] = field(default_factory=dict)
+    annotations: List[Dict] = field(default_factory=list)
+    images: DefaultDict[int, Dict] = field(
+        default_factory=lambda: defaultdict(lambda: {"name": None, "anns": []})
+    )
 
-        self.classes = {}  # Maps class ID to class name
-        self.annotations = (
-            []
-        )  # Maps annotation ids to the corresponding annotation / prediction
-
-        # Maps an image id to an image name and a list of annotation ids
-        self.images = defaultdict(lambda: {"name": None, "anns": []})
+    # def __init__(self, name: str, max_dets: int = 100):
+    #     self.name = name
+    #     self.max_dets = max_dets
+    #
+    #     self.classes = {}  # Maps class ID to class name
+    #     self.annotations = (
+    #         []
+    #     )  # Maps annotation ids to the corresponding annotation / prediction
+    #
+    #     # Maps an image id to an image name and a list of annotation ids
+    #     self.images = defaultdict(lambda: {"name": None, "anns": []})
 
     def _get_ignored_classes(self, image_id: int) -> set:
         anns = self.get(image_id)

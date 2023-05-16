@@ -2,9 +2,12 @@ import random
 from unittest import TestCase
 
 from tests.constants import RANDOM_SEED, TEST_ASSETS_DIR, mAP_threshold
-from tidecv.helpers import (create_filtered_Data,
-                            enlarge_dataset_to_respect_TIDE,
-                            filter_dataset_to_label, json_to_Data)
+from tidecv.helpers import (
+    create_filtered_Data,
+    enlarge_dataset_to_respect_TIDE,
+    filter_dataset_to_label,
+    json_to_Data,
+)
 from tidecv.quantify import TIDE
 
 

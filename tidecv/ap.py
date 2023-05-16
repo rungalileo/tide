@@ -1,23 +1,31 @@
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Set, Optional, Tuple, DefaultDict
 
 import numpy as np
 from pycocotools import mask as mask_utils
-
+from dataclasses import dataclass, field
+from dataclasses_json import dataclass_json
 from .data import Data
 
 
+@dataclass_json
+@dataclass
 class APDataObject:
     """
     Stores all the information necessary to calculate the AP for one IoU and one class.
     Note: I type annotated this because why not.
     """
 
-    def __init__(self):
-        self.data_points = {}  # dict with all preds (id -> data)
-        self.false_negatives = set()  # set of FN ids (i.e., not TPs, i.e., FN + Missed)
-        self.num_gt_positives = 0  # total number of GTs
-        self.curve = None
+    data_points: Dict = field(default_factory=dict)
+    false_negatives: Set = field(default_factory=set)
+    num_gt_positives: int = 0
+    curve: Optional[Tuple] = None
+
+    # def __init__(self):
+    #     self.data_points = {}  # dict with all preds (id -> data)
+    #     self.false_negatives = set()  # set of FN ids (i.e., not TPs, i.e., FN + Missed)
+    #     self.num_gt_positives = 0  # total number of GTs
+    #     self.curve = None
 
     def apply_qualifier_no_check(self, kept_preds: set, kept_gts: set) -> object:
         """
@@ -156,11 +164,15 @@ class APDataObject:
         return sum(y_range) / len(y_range) * 100
 
 
+@dataclass_json
+@dataclass
 class ClassedAPDataObject:
     """Stores an APDataObject for each class in the dataset."""
 
-    def __init__(self):
-        self.objs = defaultdict(lambda: APDataObject())
+    objs: DefaultDict[int, APDataObject] = field(
+        default_factory=lambda: defaultdict(lambda: APDataObject())
+    )
+    # objs: DefaultDict[int, APDataObject] = defaultdict(lambda: APDataObject())
 
     def apply_qualifier(
         self, pred_dict: dict, gt_dict: dict, check: bool = False
@@ -329,7 +341,6 @@ class APEval:
             self._eval_image(x, y, type_str)
 
     def compute_mAP(self):
-
         num_threshs = len(self.ap_data)
         thresh_APs = []
 

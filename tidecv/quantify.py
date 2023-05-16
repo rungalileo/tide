@@ -1,5 +1,5 @@
 from collections import OrderedDict, defaultdict
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 from pycocotools import mask as mask_utils
@@ -10,7 +10,18 @@ from .ap import ClassedAPDataObject
 from .data import Data
 from .errors.main_errors import *
 from .errors.qualifiers import Qualifier
+from dataclasses import dataclass, field
+from dataclasses_json import dataclass_json
 
+
+TIDE_ERROR_MAP = {
+    ClassError: "ClassError",
+    BoxError: "BoxError",
+    ClassBoxError: "ClassBoxError",
+    DuplicateError: "DuplicateError",
+    BackgroundError: "BackgroundError",
+    MissedError: "MissedError",
+}
 
 class TIDEExample:
     """Computes all the data needed to evaluate a set of predictions and gt for a single image."""
@@ -142,41 +153,69 @@ class TIDEExample:
             self.gt_used_cls = self.gt_used_iou * self.gt_cls_matching
 
 
+@dataclass_json
+@dataclass
 class TIDERun:
     """Holds the data for a single run of TIDE."""
 
-    # Temporary variables stored in ground truth that we need to clear after a run
-    _temp_vars = ["best_score", "best_id", "used", "matched_with", "_idx", "usable"]
+    gt: Data
+    preds: Data
+    pos_thresh: float
+    bg_thresh: float
+    mode: str
+    max_dets: int
+    run_errors: bool = True
+    errors: List = field(default_factory=list)
+    error_dict: Dict[str, List] = field(default_factory=dict)
+    ap_data: ClassedAPDataObject = field(default_factory=ClassedAPDataObject)
+    qualifiers: Dict = field(default_factory=dict)
+    false_negatives: Dict = field(default_factory=dict)
 
-    def __init__(
-        self,
-        gt: Data,
-        preds: Data,
-        pos_thresh: float,
-        bg_thresh: float,
-        mode: str,
-        max_dets: int,
-        run_errors: bool = True,
-    ):
-        self.gt = gt
-        self.preds = preds
-
-        self.errors = []
-        self.error_dict = {_type: [] for _type in TIDE._error_types}
-
-        self.ap_data = ClassedAPDataObject()
-        self.qualifiers = {}
-
-        # A list of false negatives per class
-        self.false_negatives = {_id: [] for _id in self.gt.classes}
-
-        self.pos_thresh = pos_thresh
-        self.bg_thresh = bg_thresh
-        self.mode = mode
-        self.max_dets = max_dets
-        self.run_errors = run_errors
-
+    def __post_init__(self):
+        # Temporary variables stored in ground truth that we need to clear after a run
+        self._temp_vars = [
+            "best_score",
+            "best_id",
+            "used",
+            "matched_with",
+            "_idx",
+            "usable",
+        ]
+        if not self.error_dict:
+            self.error_dict = {TIDE_ERROR_MAP[_type]: [] for _type in TIDE._error_types}
+        if not self.false_negatives:
+            self.false_negatives = {_id: [] for _id in self.gt.classes}
         self._run()
+
+    # def __init__(
+    #     self,
+    #     gt: Data,
+    #     preds: Data,
+    #     pos_thresh: float,
+    #     bg_thresh: float,
+    #     mode: str,
+    #     max_dets: int,
+    #     run_errors: bool = True,
+    # ):
+    #     self.gt = gt
+    #     self.preds = preds
+    #
+    #     self.errors = []
+    #     self.error_dict = {_type: [] for _type in TIDE._error_types}
+    #
+    #     self.ap_data = ClassedAPDataObject()
+    #     self.qualifiers = {}
+    #
+    #     # A list of false negatives per class
+    #     self.false_negatives = {_id: [] for _id in self.gt.classes}
+    #
+    #     self.pos_thresh = pos_thresh
+    #     self.bg_thresh = bg_thresh
+    #     self.mode = mode
+    #     self.max_dets = max_dets
+    #     self.run_errors = run_errors
+    #
+    #     self._run()
 
     def _run(self):
         """And awaaay we go"""
@@ -214,10 +253,9 @@ class TIDERun:
 
     def _add_error(self, error):
         self.errors.append(error)
-        self.error_dict[type(error)].append(error)
+        self.error_dict[TIDE_ERROR_MAP[type(error)]].append(error)
 
     def _eval_image(self, preds: list, gt: list):
-
         for truth in gt:
             if not truth["ignore"]:
                 self.ap_data.add_gt_positives(truth["class"], 1)
@@ -239,7 +277,6 @@ class TIDERun:
         preds = ex.preds  # In case the number of predictions was restricted to the max
 
         for pred_idx, pred in enumerate(preds):
-
             pred["info"] = {"iou": pred["iou"], "used": pred["used"]}
             if pred["used"]:
                 pred["info"]["matched_with"] = pred["matched_with"]
@@ -458,7 +495,7 @@ class TIDERun:
 
         for error in error_types:
             if qual is None:
-                counts[error] = len(self.error_dict[error])
+                counts[error] = len(self.error_dict[TIDE_ERROR_MAP[error]])
             else:
                 func = qualifiers.make_qualifier(error, qual)
                 counts[error] = len([x for x in self.errors if func(x)])
@@ -484,6 +521,8 @@ class TIDERun:
         return new_ap_data
 
 
+@dataclass_json
+@dataclass
 class TIDE:
     """
     ████████╗██╗██████╗ ███████╗
@@ -513,24 +552,38 @@ class TIDE:
     BOX = "bbox"
     MASK = "mask"
 
-    def __init__(
-        self,
-        pos_threshold: float = 0.5,
-        background_threshold: float = 0.1,
-        mode: str = BOX,
-    ):
-        self.pos_thresh = pos_threshold
-        self.bg_thresh = background_threshold
-        self.mode = mode
+    mode: str = BOX
+    pos_threshold: float = 0.5
+    background_threshold: float = 0.1
+    runs: Dict = field(default_factory=dict)
+    run_thresholds: Dict = field(default_factory=dict)
+    run_main_errors: Dict = field(default_factory=dict)
+    run_special_errors: Dict = field(default_factory=dict)
+    qualifiers: OrderedDict = field(default_factory=OrderedDict)
 
+    def __post_init__(self):
+        self.bg_thresh = self.background_threshold
+        self.pos_thresh = self.pos_threshold
         self.pos_thresh_int = int(self.pos_thresh * 100)
 
-        self.runs = {}
-        self.run_thresholds = {}
-        self.run_main_errors = {}
-        self.run_special_errors = {}
-
-        self.qualifiers = OrderedDict()
+    # def __init__(
+    #     self,
+    #     pos_threshold: float = 0.5,
+    #     background_threshold: float = 0.1,
+    #     mode: str = BOX,
+    # ):
+    #     self.pos_thresh = pos_threshold
+    #     self.bg_thresh = background_threshold
+    #     self.mode = mode
+    #
+    #     self.pos_thresh_int = int(self.pos_thresh * 100)
+    #
+    #     self.runs = {}
+    #     self.run_thresholds = {}
+    #     self.run_main_errors = {}
+    #     self.run_special_errors = {}
+    #
+    #     self.qualifiers = OrderedDict()
 
     def evaluate(
         self,
@@ -568,7 +621,6 @@ class TIDE:
         mode: str = None,
         name: str = None,
     ) -> dict:
-
         if pos_threshold is None:
             pos_threshold = self.pos_thresh
         if name is None:
@@ -577,7 +629,6 @@ class TIDE:
         self.run_thresholds[name] = []
 
         for thresh in thresholds:
-
             run = self.evaluate(
                 gt,
                 preds,

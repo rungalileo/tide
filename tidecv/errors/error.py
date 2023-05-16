@@ -1,6 +1,8 @@
-from typing import Union
+from typing import Union, Dict
+from dataclasses import dataclass
 
 
+@dataclass
 class Error:
     """A base class for all error types."""
 
@@ -18,7 +20,8 @@ class Error:
         """Returns the original version of this data point."""
 
         if hasattr(self, "pred"):
-            # If an ignored instance is an error, it's not in the data point list, so there's no "unfixed" entry
+            # If an ignored instance is an error, it's not in the data point list,
+            # so there's no "unfixed" entry
             if self.pred["used"] is None:
                 return None
             else:
@@ -70,6 +73,7 @@ class Error:
         return info
 
 
+@dataclass
 class BestGTMatch:
     """
     Some errors are fixed by changing false positives to true positives.
@@ -83,10 +87,10 @@ class BestGTMatch:
     other errors caused by the same GT.
     """
 
-    def __init__(self, pred, gt):
-        self.pred = pred
-        self.gt = gt
+    pred: Dict[str, int]
+    gt: Dict[str, int]
 
+    def __post_init__(self):
         if self.gt["used"]:
             self.suppress = True
         else:
@@ -102,8 +106,27 @@ class BestGTMatch:
                 self.gt["best_score"] = score
                 self.gt["best_id"] = self.pred["_id"]
 
+    # def __init__(self, pred, gt):
+    #     self.pred = pred
+    #     self.gt = gt
+    #
+    #     if self.gt["used"]:
+    #         self.suppress = True
+    #     else:
+    #         self.suppress = False
+    #         self.gt["usable"] = True
+    #
+    #         score = self.pred["score"]
+    #
+    #         if not "best_score" in self.gt:
+    #             self.gt["best_score"] = -1
+    #
+    #         if self.gt["best_score"] < score:
+    #             self.gt["best_score"] = score
+    #             self.gt["best_id"] = self.pred["_id"]
+
     def fix(self):
         if self.suppress or self.gt["best_id"] != self.pred["_id"]:
             return None
         else:
-            return (self.pred["score"], True, self.pred["info"])
+            return self.pred["score"], True, self.pred["info"]
